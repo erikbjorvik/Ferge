@@ -8,6 +8,13 @@ class FergeData {
 		$this->db = new mysqli("localhost","root","","fergetider");
 	}
 
+	/**
+	*
+	*
+	* Returnerer hvor mange samband det er i gitt rute.
+	*
+	*
+	*/
 	function antallSambandIRute($ruteId) {
 
 		$stmt = $this->db->prepare("SELECT COUNT(id) FROM Samband WHERE id=?");
@@ -64,7 +71,14 @@ class FergeData {
 		return $spesDag;
 	}
 
-	function hentRutetider($ruteId, $dagId) {
+	/**
+	*
+	* Returnerer avgangsdata for gitt rute og dag. 
+	* Se hvilke data som returneres i whileløkken.
+	*
+	*/
+	function hentRutetider($ruteId, $dagId, $fraTid='00:00:00') {
+
 		$stmt = $this->db->prepare("SELECT Ruter.ruteNavn AS Rutenavn, Ruter.vei AS Vei, Ruter.id AS RuteID, 
 							Samband.fra AS FraDestinasjonID, Samband.til AS TilDestinasjonID, Samband.init AS SambandInit, 
 							Avganger.dagType AS dagId, Avganger.id AS AvgangID, Avganger.tid AS Avgang, Avganger.notat AS notat
@@ -72,10 +86,10 @@ class FergeData {
 							ON Ruter.id = Samband.ruteId
 							INNER JOIN Avganger
 							ON Avganger.samband = Samband.id
-							WHERE Ruter.id=? AND Avganger.dagType=?
+							WHERE Ruter.id=? AND Avganger.dagType=? AND Avganger.tid>=?
 							ORDER BY Ruter.id ASC, Avganger.tid ASC");
 		
-		$stmt->bind_param("ii", $ruteId, $dagId);
+		$stmt->bind_param("iis", $ruteId, $dagId, $fraTid);
 		$stmt->execute();
 		$stmt->bind_result($rutenavn, $vei, $ruteId, $fraDestinasjonId, $tilDestinasjonId, $sambandInit, $dagId, $avgangId, $avgangTid, $avgangNotat);
 
@@ -98,6 +112,13 @@ class FergeData {
 		return $r;
 	}
 
+	/**
+	*
+	*
+	* Returnerer hvilken dagtype det er for en gitt dato.
+	*
+	*
+	*/
 	public function dagForDato($rute, $dato) {
 		$spsDag = $this->spesialDagRute($rute, $dato);
 
@@ -118,6 +139,14 @@ class FergeData {
 		}
 	}
 
+	/**
+	*
+	*
+	* Returnerer full liste av avgangsData for gitt dag.
+	* Dersom $dato=0 får man ruten for samme dag. 
+	* Kan defineres selv. 
+	*
+	*/
 	public function avgangerDag($rute, $dato=0) {
 		
 		if ($dato == 0) {
@@ -129,6 +158,39 @@ class FergeData {
 		
 	}
 
+	/**
+	*
+	* Returnerer avgangsdata for neste avgang.
+	* Dersom ikke $dato og $tid er definert vil neste avgang
+	* basert på dato og tid når metoden blir kalt.
+	* 
+	* Disse parametrene kan man også sette selv.
+	*
+	*/
+	public function nesteAvgang($rute, $dato=0, $tid=0) {
+		
+		$t = $this->getTid();
+
+		if ($dato == 0) 
+			$dato = $t[0];
+
+		if ($tid == 0) 
+			$tid = $t[1];
+
+		$r = $this->hentRutetider($rute, $this->dagForDato($rute,$dato), $tid);
+
+		return $r[0];
+		
+
+	}
+
+	/**
+	*
+	* Returnerer array med riktig tidssone.
+	* 0 -> Dato
+	* 1 -> Tid
+	*
+	*/
 	public function getTid() {
 
 	    $DT = new DateTime();
@@ -160,6 +222,7 @@ foreach ($s as $d) {
 	echo $d[6] . " - " . $d[1] . "<br />";
 }
 
+echo "<br/>Neste avgang:" . $fd->nesteAvgang(2)[1];
 
 ?>
 </body>
