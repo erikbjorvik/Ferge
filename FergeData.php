@@ -98,6 +98,26 @@ class FergeData {
 		return $r;
 	}
 
+	public function dagForDato($rute, $dato) {
+		$spsDag = $this->spesialDagRute($rute, $dato);
+
+		if ($spsDag>3) {
+			return $spsDag;
+		}
+
+		else if ((date('D', strtotime($dato))=='Sat') && ($this->erDetDagsIdIRute(2, $rute))) {
+			return 2;
+		}
+
+		else if ((date('D', strtotime($dato))=='Sun') && ($this->erDetDagsIdIRute(3, $rute))) {
+			return 3;
+		}
+
+		else {
+			return 1;
+		}
+	}
+
 	public function avgangerDag($rute, $dato=0) {
 		
 		if ($dato == 0) {
@@ -105,24 +125,7 @@ class FergeData {
 			$dato = $t[0];
 		}
 
-		//Sjekke om det er spesialdag.
-		$spsDag = $this->spesialDagRute($rute, $dato);
-
-		if ($spsDag>3) {
-			return $this->hentRutetider($rute, $spsDag);
-		}
-
-		else if ((date('D', strtotime($dato))=='Sat') && ($this->erDetDagsIdIRute(2, $rute))) {
-			return $this->hentRutetider($rute, 2);
-		}
-
-		else if ((date('D', strtotime($dato))=='Sun') && ($this->erDetDagsIdIRute(3, $rute))) {
-			return $this->hentRutetider($rute, 3);
-		}
-
-		else {
-			return $this->hentRutetider($rute, 1);
-		}
+		return $this->hentRutetider($rute, $this->dagForDato($rute,$dato));
 		
 	}
 
