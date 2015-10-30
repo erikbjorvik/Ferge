@@ -99,17 +99,20 @@ class FergeData {
 		while ($stmt->fetch()) {
 			$r[$i][0] = $avgangId;
 			$r[$i][1] = $avgangTid;
-			$r[$i][2] = $avgangNotat;
+			$r[$i][2] = utf8_encode($avgangNotat);
 			$r[$i][3] = $fraDestinasjonId;
 			$r[$i][4] = $tilDestinasjonId;
 			$r[$i][5] = $sambandInit;
 			$r[$i][6] = $dagId;
 			$r[$i][7] = $vei;
-			$r[$i][8] = $rutenavn;
+			$r[$i][8] = utf8_encode($rutenavn);
 			$i++;
 		} 
 
-		return $r;
+		if ($i==0)
+			return -1;
+		else
+			return $r;
 	}
 
 	/**
@@ -153,7 +156,6 @@ class FergeData {
 			$t = $this->getTid();
 			$dato = $t[0];
 		}
-
 		return $this->hentRutetider($rute, $this->dagForDato($rute,$dato));
 		
 	}
@@ -178,11 +180,127 @@ class FergeData {
 			$tid = $t[1];
 
 		$r = $this->hentRutetider($rute, $this->dagForDato($rute,$dato), $tid);
+		
+		while ($r==-1){
+			$d = strtotime("+1 day",strtotime($dato));
+			$dato = date("Y-m-d",$d); //Neste dag.
+			$tid = "00:00:00";
+			$r = $this->hentRutetider($rute, $this->dagForDato($rute,$dato), $tid);
+		}
 
 		return $r[0];
 		
 
 	}
+
+	public function fartoyForRute($rute) {
+		$stmt = $this->db->prepare("SELECT Fartoy.id, Fartoy.navn, Fartoy.pasKap, Fartoy.bilkap, Fartoy.maxHoyde, Fartoy.handicap, Fartoy.kafeteria, 
+									Fartoy.wifi, Fartoy.marineTraffic
+									FROM FartoyRuter INNER JOIN Fartoy ON FartoyRuter.fartoyid=Fartoy.id WHERE FartoyRuter.ruteId = ?");
+		$stmt->bind_param("i", $rute);
+		$stmt->execute();
+		$stmt->bind_result($id, $navn, $pasKap, $bilKap, $maxHoyde, $handicap, $kafeteria, $wifi, $marineTraffic);
+
+		$r = array();
+		$i=0;
+		while ($stmt->fetch()) {
+			$r[$i][0] = $id;
+			$r[$i][1] = utf8_encode($navn);
+			$r[$i][2] = $pasKap;
+			$r[$i][3] = $bilKap;
+			$r[$i][4] = $maxHoyde;
+			$r[$i][5] = $handicap;
+			$r[$i][6] = $kafeteria;
+			$r[$i][7] = $wifi;
+			$r[$i][8] = $marineTraffic;
+			$i++;
+		}
+
+		return $r;
+	}
+
+	public function fartoyById($id) {
+		$stmt = $this->db->prepare("SELECT Fartoy.id, Fartoy.navn, Fartoy.pasKap, Fartoy.bilkap, Fartoy.maxHoyde, Fartoy.handicap, Fartoy.kafeteria, 
+									Fartoy.wifi, Fartoy.marineTraffic
+									FROM FartoyRuter INNER JOIN Fartoy ON FartoyRuter.fartoyid=Fartoy.id WHERE Fartoy.id = ?");
+		$stmt->bind_param("i", $id);
+		$stmt->execute();
+		$stmt->bind_result($id, $navn, $pasKap, $bilKap, $maxHoyde, $handicap, $kafeteria, $wifi, $marineTraffic);
+		$stmt->fetch();
+
+		$r[0] = $id;
+		$r[1] = utf8_encode($navn);
+		$r[2] = $pasKap;
+		$r[3] = $bilKap;
+		$r[4] = $maxHoyde;
+		$r[5] = $handicap;
+		$r[6] = $kafeteria;
+		$r[7] = $wifi;
+		$r[8] = $marineTraffic;
+
+		return $r;
+	}
+
+	public function hentLokFraMT($p) {
+		$str = file_get_contents('http://www.marinetraffic.com/en/ais/details/ships/'.$p);
+		$pos = strpos ($str, 'details_data_link">'); 
+		$ak = substr($str, $pos+19);
+		$ak = str_replace("&deg;" ,"", $ak);
+		$ak = str_replace("<" ,"", $ak);
+		$bit = explode("/", $ak, 3);
+		unset($bit[2]);
+		return $bit;
+	}
+
+	public function getFartoyLokasjon($fartoy) {
+
+		$f = $this->fartoyById($fartoy);
+
+		$stmt = $this->db->prepare("SELECT lat, lng, oppdatert FROM FartoyLokasjoner WHERE fartoyId=?");
+		$stmt->bind_param("i", $fartoy);
+		$stmt->execute();
+		$stmt->store_result();
+		$stmt->bind_result($lat, $lng, $oppdatert);
+		$stmt->fetch();
+
+		if ($stmt->num_rows!=0) {
+			if ($oppdatert<(time()-(60*2))) { 
+
+				$l = $this->hentLokFraMT($f[8]);
+				$stmt2 = $this->db->prepare("UPDATE FartoyLokasjoner SET lat=?, lng=?, oppdatert=? WHERE fartoyId=?");
+				$stmt2->bind_param("ddii", $l[0], $l[1], $this->getTid()[2], $fartoy);
+				$stmt2->execute();
+				$l[2] = 1;
+				return $l;
+
+			}//Gammel oppføring
+
+			else {
+
+				$r = array();
+				$r[0] = $lat;
+				$r[1] = $lng;
+
+				return $r;
+
+			}//Gyldig oppføring
+
+		}//Oppføring fantes
+
+		else {
+			$l = $this->hentLokFraMT($f[8]);
+			$stmt2 = $this->db->prepare("INSERT INTO FartoyLokasjoner (lat, lng, oppdatert, fartoyId) 
+				VALUES (?, ?, ?, ?)");
+
+			$stmt2->bind_param("ddii", $l[0], $l[1], $this->getTid()[2], $fartoy);
+			$stmt2->execute();
+
+			return $l;
+
+		}//Oppføring fantes ikke
+
+	}
+
 
 	/**
 	*
@@ -198,7 +316,8 @@ class FergeData {
 
 	    $r = array();
 	    $r[0] = $DT->format('Y-m-d');
-	    $r[1]= $DT->format('H:i:s');
+	    $r[1] = $DT->format('H:i:s');
+	    $r[2] = $DT->getTimestamp();
 
 	    return $r;
     
@@ -213,7 +332,7 @@ class FergeData {
 
 <body>
 <?php
-
+/*
 $fd = new FergeData();
 
 $s = $fd->avgangerDag(2);
@@ -223,6 +342,16 @@ foreach ($s as $d) {
 }
 
 echo "<br/>Neste avgang:" . $fd->nesteAvgang(2)[1];
+
+echo "<br />Fartøy i rute: ";
+$f = $fd->fartoyForRute(2);
+
+foreach ($f as $fa) {
+	$l = $fd->getFartoyLokasjon($fa[0]);
+	echo "<p>".$fa[1] . ", lokasjon: " . $l[0]."/".$l[1] ."</p>";
+}
+*/
+
 
 ?>
 </body>

@@ -1,0 +1,19 @@
+<html>
+<head>
+</head>
+<body>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<script>
+
+$.ajax({
+	method: "GET",
+	url: "lesMt.php",
+	success: function(data) {
+		var obj = jQuery.parseJSON(data);
+		window.alert(obj.lat + "/" + obj.lng);
+	}
+});
+
+</script>
+</body>
+</html>
