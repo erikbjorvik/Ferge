@@ -28,7 +28,10 @@ if (1) {
 				"sambandInit" : '.$ar[5] . ',
 				"dagId" : ' . $ar[6] . ',
 				"vei" : "' . $ar[7] . '", 
-				"rutenavn" : "'.$ar[8].'" 
+				"rutenavn" : "'.$ar[8].'",
+				"lat" : "'.$ar[9].'",
+				"lng" : "'.$ar[10].'",
+				"zoom" : "'.$ar[11].'"
 				}';
 
 		break;
@@ -50,7 +53,7 @@ if (1) {
 					"wifi" : '.$fa[7].',
 					"marineTraffic" : "'.$fa[8].'",
 					"lat" : '.$l[0].',
-					"long" : '.$l[1].'
+					"lng" : '.$l[1].'
 					}';
 				if ($i<(count($f)-1))
 					$jsonRespons.= ",";
