@@ -12,7 +12,7 @@ $jsonRespons = '{"status" : '. $status;
 
 
 
-if ($status==1) {
+if (1) {
 
 	switch($_GET['request']) {
 

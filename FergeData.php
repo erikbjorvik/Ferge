@@ -10,6 +10,23 @@ class FergeData {
 
 	/**
 	*
+	* Returnerer true dersom rute-iden finnes og ruten er aktiv
+	*
+	*/
+	function finnesRuteId($id) {
+		$stmt = $this->db->prepare("SELECT id FROM Ruter WHERE id=? AND aktiv='1'");
+		$stmt->bind_param("i", $id);
+		$stmt->execute();
+		$stmt->store_result();
+
+		if ($stmt->num_rows>0)
+			return true;
+		else 
+			return false;
+	}
+
+	/**
+	*
 	*
 	* Returnerer hvor mange samband det er i gitt rute.
 	*
@@ -77,21 +94,22 @@ class FergeData {
 	* Se hvilke data som returneres i whileløkken.
 	*
 	*/
-	function hentRutetider($ruteId, $dagId, $fraTid='00:00:00') {
+	function hentRutetider($ruteId, $dagId, $fraTid='00:00:00', $bareAktive=1) {
 
-		$stmt = $this->db->prepare("SELECT Ruter.ruteNavn AS Rutenavn, Ruter.vei AS Vei, Ruter.id AS RuteID, 
+		$stmt = $this->db->prepare("SELECT Ruter.ruteNavn AS Rutenavn, Ruter.vei AS Vei, Ruter.id AS RuteID, Ruter.lat AS lat, Ruter.lng AS lng,
+							Ruter.zoom, Ruter.op, Ruter.op_wb, Ruter.overfartstid, 
 							Samband.fra AS FraDestinasjonID, Samband.til AS TilDestinasjonID, Samband.init AS SambandInit, 
 							Avganger.dagType AS dagId, Avganger.id AS AvgangID, Avganger.tid AS Avgang, Avganger.notat AS notat
 							FROM Ruter INNER JOIN Samband
 							ON Ruter.id = Samband.ruteId
 							INNER JOIN Avganger
 							ON Avganger.samband = Samband.id
-							WHERE Ruter.id=? AND Avganger.dagType=? AND Avganger.tid>=?
+							WHERE Ruter.id=? AND Avganger.dagType=? AND Avganger.tid>=? AND Ruter.aktiv=? 
 							ORDER BY Ruter.id ASC, Avganger.tid ASC");
 		
-		$stmt->bind_param("iis", $ruteId, $dagId, $fraTid);
+		$stmt->bind_param("iisi", $ruteId, $dagId, $fraTid, $bareAktive);
 		$stmt->execute();
-		$stmt->bind_result($rutenavn, $vei, $ruteId, $fraDestinasjonId, $tilDestinasjonId, $sambandInit, $dagId, $avgangId, $avgangTid, $avgangNotat);
+		$stmt->bind_result($rutenavn, $vei, $ruteId, $lat, $long, $zoom, $operator, $operator_web, $overfartstid, $fraDestinasjonId, $tilDestinasjonId, $sambandInit, $dagId, $avgangId, $avgangTid, $avgangNotat);
 
 		$r = array();
 		$i = 0;
@@ -106,6 +124,12 @@ class FergeData {
 			$r[$i][6] = $dagId;
 			$r[$i][7] = $vei;
 			$r[$i][8] = utf8_encode($rutenavn);
+			$r[$i][9] = $lat;
+			$r[$i][10] = $long;
+			$r[$i][11] = $zoom;
+			$r[$i][12] = $operator;
+			$r[$i][13] = $operator_web;
+			$r[$i][14] = $overfartstid;
 			$i++;
 		} 
 
@@ -170,23 +194,34 @@ class FergeData {
 	*
 	*/
 	public function nesteAvgang($rute, $dato=0, $tid=0) {
-		
+
 		$t = $this->getTid();
 
-		if ($dato == 0) 
+		if ($dato == 0) {
 			$dato = $t[0];
+		}
 
-		if ($tid == 0) 
+		if ($tid == 0) {
 			$tid = $t[1];
+		}
 
 		$r = $this->hentRutetider($rute, $this->dagForDato($rute,$dato), $tid);
-		
+		$omDager = 0;
+
 		while ($r==-1){
-			$d = strtotime("+1 day",strtotime($dato));
+			$omDager++;
+			$d = strtotime("+".$omDager." day",strtotime($dato));
 			$dato = date("Y-m-d",$d); //Neste dag.
 			$tid = "00:00:00";
 			$r = $this->hentRutetider($rute, $this->dagForDato($rute,$dato), $tid);
 		}
+
+		//echo "dag:" . $dato . "om dager: " . $omDager;
+
+		$r[0][15] = $dato;
+		$r[0][16] = $omDager;
+
+		//print_r($r[0]);*/
 
 		return $r[0];
 		
@@ -318,13 +353,18 @@ class FergeData {
 	    $r[0] = $DT->format('Y-m-d');
 	    $r[1] = $DT->format('H:i:s');
 	    $r[2] = $DT->getTimestamp();
-
+/*
+	    $r[0] = date('Y-m-d');
+	    $r[1] = date('H:i:s');
+*/
 	    return $r;
     
   	}
 
 }
 ?>
+<?php
+/*
 <html>
 <head>
 <meta charset="UTF-8">
@@ -332,7 +372,6 @@ class FergeData {
 
 <body>
 <?php
-/*
 $fd = new FergeData();
 
 $s = $fd->avgangerDag(2);
@@ -350,9 +389,8 @@ foreach ($f as $fa) {
 	$l = $fd->getFartoyLokasjon($fa[0]);
 	echo "<p>".$fa[1] . ", lokasjon: " . $l[0]."/".$l[1] ."</p>";
 }
-*/
 
-
-?>
 </body>
 </html>
+*/
+?>
